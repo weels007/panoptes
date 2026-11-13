@@ -1,116 +1,116 @@
 # Panoptes
 
-**Decentralized Content Moderation — moderasi konten yang dijalankan oleh banyak AI validator secara desentralisasi.**
+**Decentralized content moderation — adjudicated by many independent AI validators.**
 
 [![GenLayer Intelligent Contract](https://img.shields.io/badge/GenLayer-Intelligent%20Contract-6D5DF5)](https://docs.genlayer.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit/)
 
-Panoptes (Πανόπτης — "yang mengawasi segalanya", raksasa bermata seratus dalam mitologi Yunani) memindahkan keputusan moderasi dari backend satu perusahaan ke konsensus banyak AI validator di GenLayer.
+Panoptes (Πανόπτης — "the all-seeing one", the hundred-eyed giant of Greek mythology) moves moderation decisions from a single company's backend to consensus among many AI validators on GenLayer.
 
-## Masalah
+## The problem
 
-Ketika sebuah konten dihapus, biasanya tidak bisa dilihat siapa yang memutuskan, mengapa, atau apakah ada yang bisa memeriksanya. Moderasi hari ini adalah backend satu perusahaan, satu model, dan satu keputusan yang tidak bisa dipertanggungjawabkan.
+When content is removed, it is usually impossible to see who decided, why, or whether anyone can review it. Moderation today is one company's backend, one model, and one unaccountable decision.
 
-## Cara kerja
+## How it works
 
 ```
 submit_content(text)
       │
       ▼
-Leader validator ── LLM mengklasifikasi konten (kategori + confidence)
+Leader validator ── LLM classifies the content (category + confidence)
       │
       ▼
-Validator lain ── Menjalankan klasifikasi yang SAMA secara independen,
-      │            lalu membandingkan field keputusan
+Other validators ── Run the SAME classification independently,
+      │               then compare the decision fields
       │
-      ├── mayoritas sepakat ──► kasus ditulis on-chain
-      └── tidak sepakat ──────► transaksi undetermined (tidak ada state berubah)
-      
-Keputusan akhir = threshold TETAP di kontrak (bukan output model):
+      ├── majority agrees ──► case written on-chain
+      └── disagree ─────────► transaction undetermined (no state change)
+
+Final decision = FIXED thresholds in the contract (not model output):
       primary_category = "none"      → ALLOW
       confidence > 70                → BLOCK
       confidence > 40                → FLAG
-      selainnya                      → ALLOW
+      otherwise                      → ALLOW
 ```
 
-Prinsip inti: **model tidak pernah mendapat kata akhir.** Model hanya mengembalikan `categories`, `primary_category`, `confidence`, dan `reasoning`. Field `decision` yang diselundupkan model akan ditolak oleh validasi ketat kontrak. Threshold ada di kode, bukan di prompt.
+Core principle: **the model never gets the final say.** The model only returns `categories`, `primary_category`, `confidence`, and `reasoning`. A `decision` field smuggled by the model is rejected by the contract's strict validation. Thresholds live in code, not in the prompt.
 
-## Fitur
+## Features
 
-- **Guidelines per komunitas** — setiap komunitas mendefinisikan aturannya sendiri dalam bahasa alami (permanen).
-- **Konsensus klasifikasi** — Equivalence Principle Pattern 1: validator menjalankan ulang klasifikasi dan membandingkan `primary_category`, keputusan yang diturunkan dari threshold, **dan confidence dalam toleransi ±10**. Teks analisis boleh berbeda antar node.
-- **Appeal** — submitter dapat membandingkan keputusan maksimal 3 kali, dengan argumen yang ikut masuk ke prompt klasifikasi ulang.
-- **Human-in-the-loop** — creator komunitas dapat menandai kasus untuk review manual lalu memutuskan keputusan final **beserta catatan justifikasi wajib** yang ikut tersimpan di ledger.
-- **Reputasi reviewer agent** — agent yang terdaftar mereview kasus; skor = persentase review yang sesuai keputusan final. Reputasi otomatis disinkronkan saat keputusan berubah lewat appeal/human review. **Submitter dan creator tidak boleh menilai kasusnya sendiri.**
-- **Riwayat revisi append-only** — setiap perubahan keputusan (submit → appeal → flag → resolve) meninggalkan baris `CaseRevision` yang tidak pernah ditimpa; keputusan dan penalaran lama tetap terbaca.
-- **Audit log publik** — setiap kasus tersimpan on-chain dan bisa dibaca siapa pun tanpa wallet.
+- **Per-community guidelines** — each community defines its own rules in natural language (immutable).
+- **Classification consensus** — Equivalence Principle Pattern 1: validators re-run classification and compare `primary_category`, the threshold-derived decision, **and confidence within a ±10 tolerance**. Reasoning text may differ across nodes.
+- **Appeals** — the submitter may appeal a decision up to 3 times, with an argument included in the re-classification prompt.
+- **Human-in-the-loop** — the community creator can flag a case for manual review and record a final decision **with a mandatory justification note** stored in the ledger.
+- **Reviewer-agent reputation** — registered agents review cases; score = share of reviews that agreed with the final decision. Reputation is re-synced automatically when the decision changes via appeal/human review. **The submitter and creator may not judge cases they control.**
+- **Append-only revision history** — every decision change (submit → appeal → flag → resolve) records a `CaseRevision` row that is never overwritten; prior decisions and reasoning remain readable.
+- **Public audit log** — every case is stored on-chain and readable by anyone, without a wallet.
 
-## Metode kontrak
+## Contract methods
 
-| Method | Jenis | Deskripsi |
+| Method | Kind | Description |
 |---|---|---|
-| `create_community(id, name, rules)` | write | Daftarkan guidelines komunitas |
-| `submit_content(community_id, content)` | write | Klasifikasi + simpan kasus + baris riwayat `submit`, return `case_id` |
-| `appeal_case(case_id, argument)` | write | Banding dengan argumen (submitter only, maks 3x) + baris riwayat `appeal` |
-| `flag_for_human_review(case_id)` | write | Tandai untuk review manual (creator only) + baris riwayat `flag` |
-| `resolve_human_review(case_id, final_decision, note)` | write | Putuskan keputusan final (creator only); `note` wajib 1–1000 char |
-| `register_agent(name)` | write | Daftar sebagai reviewer agent |
-| `review_case(case_id, verdict, rationale)` | write | Review kasus (agent terdaftar, 1x per kasus; submitter/creator ditolak) |
-| `get_community` / `list_communities` | view | Baca komunitas |
-| `get_case` / `list_cases` / `list_community_cases` | view | Audit log publik (terpaginasi) |
-| `get_case_reviews` | view | Review untuk sebuah kasus |
-| `get_case_history` | view | Riwayat revisi append-only untuk sebuah kasus |
-| `get_agent` / `list_agents` | view | Reputasi agent (skor 0–100) |
-| `get_stats` | view | Statistik agregat |
+| `create_community(id, name, rules)` | write | Register community guidelines |
+| `submit_content(community_id, content)` | write | Classify + store case + `submit` history row; returns `case_id` |
+| `appeal_case(case_id, argument)` | write | Appeal with an argument (submitter only, max 3) + `appeal` history row |
+| `flag_for_human_review(case_id)` | write | Flag for manual review (creator only) + `flag` history row |
+| `resolve_human_review(case_id, final_decision, note)` | write | Record the final decision (creator only); `note` required, 1–1000 chars |
+| `register_agent(name)` | write | Register as a reviewer agent |
+| `review_case(case_id, verdict, rationale)` | write | Review a case (registered agent, once per case; submitter/creator rejected) |
+| `get_community` / `list_communities` | view | Read communities |
+| `get_case` / `list_cases` / `list_community_cases` | view | Public audit log (paginated) |
+| `get_case_reviews` | view | Reviews for a case |
+| `get_case_history` | view | Append-only revision history for a case |
+| `get_agent` / `list_agents` | view | Agent reputation (score 0–100) |
+| `get_stats` | view | Aggregate statistics |
 
-## Keamanan
+## Security
 
-- **Prompt injection** — konten user dibungkus `<untrusted_content>` dengan instruksi eksplisit bahwa isinya adalah data, bukan instruksi.
-- **Validasi output ketat** — hanya 4 key yang diizinkan; key tambahan (termasuk `decision`/`status`) ditolak; kategori harus masuk allow-list; confidence harus numerik 0–100.
-- **Keputusan dihitung kontrak** — threshold bersifat konstan di kode.
-- **Validator independen** — validator tidak pernah mempercayai output leader; mereka menjalankan tugas yang sama sendiri lalu membandingkan field keputusan.
-- **Confidence terikat konsensus** — angka confidence yang disimpan (input deterministik ke threshold 40/70) harus berada dalam ±10 dari keyakinan validator yang menyetujui; prompt meminta kelipatan 5 agar tidak ada presisi semu.
-- **Anti-sybil reputasi** — submitter dan creator komunitas ditolak saat mencoba mereview kasus yang mereka kendalikan.
-- **Jejak keputusan pihak ketiga** — `resolve_human_review` menerima `note` wajib; setiap revisi tercatat append-only lewat `get_case_history`, tidak ada putusan yang ditimpa diam-diam.
+- **Prompt injection** — user content is wrapped in `<untrusted_content>` with explicit instructions that its contents are data, not instructions.
+- **Strict output validation** — only 4 keys are allowed; extra keys (including `decision`/`status`) are rejected; categories must be in the allow-list; confidence must be numeric 0–100.
+- **Contract-computed decision** — thresholds are constants in code.
+- **Independent validators** — validators never trust the leader's output; they run the same task themselves and compare decision fields.
+- **Consensus-bound confidence** — the stored confidence (a deterministic input to the 40/70 thresholds) must be within ±10 of other agreeing validators; the prompt requests multiples of 5 to avoid spurious precision.
+- **Anti-sybil reputation** — the submitter and community creator are rejected when attempting to review cases they control.
+- **Third-party decision trail** — `resolve_human_review` requires a `note`; every revision is recorded append-only via `get_case_history`, so no ruling is silently overwritten.
 
-Batasan yang jujur (lihat juga diskusi [Modeq TRUST_MODEL](https://github.com/0xFearless-1/Modeq/blob/main/docs/TRUST_MODEL.md)): kesepakatan validator menunjukkan hasil yang dapat direproduksi, bukan bukti kebenaran. Semua node menjalankan prompt yang sama, sehingga error model yang berkorelasi tetap mungkin terjadi.
+An honest limitation (see also [Modeq TRUST_MODEL](https://github.com/0xFearless-1/Modeq/blob/main/docs/TRUST_MODEL.md)): validator agreement shows a reproducible outcome, not proof of correctness. All nodes run the same prompt, so correlated model errors remain possible.
 
-## Struktur proyek
+## Project structure
 
 ```
 contracts/
   panoptes.py              # Intelligent Contract (Python)
 tests/
-  direct/                  # Test in-memory cepat, LLM di-mock
-    test_panoptes.py       # 35 test: threshold, appeal, reputasi, riwayat, anti-sybil
-  integration/             # Konsensus penuh dengan LLM nyata (3 test)
+  direct/                  # Fast in-memory tests, mocked LLM
+    test_panoptes.py       # 35 tests: thresholds, appeals, reputation, history, anti-sybil
+  integration/             # Full consensus with real LLMs (3 tests)
     test_panoptes.py
 scripts/
-  seed_canonical.py        # Seed data demo ke instance studionet
-frontend/                  # Next.js + genlayer-js (lihat frontend/README.md)
-  app/                     # Rute: /, /moderate, /audit, /agents
-  lib/contracts/           # Klien Panoptes (read + write berfee)
+  seed_canonical.py        # Seed demo data into a studionet instance
+frontend/                  # Next.js + genlayer-js (see frontend/README.md)
+  app/                     # Routes: /, /moderate, /audit, /agents
+  lib/contracts/           # Panoptes client (read + paid writes)
   lib/hooks/usePanoptes.ts # React Query hooks
-  components/              # ThresholdRuler, CaseLedger, badge, statistik
-gltest.config.yaml         # Konfigurasi jaringan test
+  components/              # ThresholdRuler, CaseLedger, badges, stats
+gltest.config.yaml         # Test network configuration
 ```
 
-## Menjalankan
+## Running
 
 ```bash
 # Setup
 pip install -r requirements.txt
 
-# Lint (di Windows: set PYTHONIOENCODING=utf-8)
+# Lint (on Windows: set PYTHONIOENCODING=utf-8)
 genvm-lint check contracts/panoptes.py
 
-# Direct tests — cepat, tanpa server
+# Direct tests — fast, no server
 pytest tests/direct/ -v
 
-# Integration tests — konsensus nyata di studionet (gratis, tanpa token)
+# Integration tests — real consensus on studionet (free, no tokens)
 gltest tests/integration/test_panoptes.py -v -s --network studionet
 
-# Seed data demo (komunitas + kasus dibuat via `genlayer write`, lalu agent + review)
+# Seed demo data (community + case created via `genlayer write`, then agent + review)
 python scripts/seed_canonical.py 0x7feE237eC31b90C2A3746437a920BfdFbf74457b
 ```
 
@@ -119,28 +119,28 @@ python scripts/seed_canonical.py 0x7feE237eC31b90C2A3746437a920BfdFbf74457b
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_CONTRACT_ADDRESS sudah berisi alamat studionet
+cp .env.example .env.local   # NEXT_PUBLIC_CONTRACT_ADDRESS already set to studionet address
 npm run dev                  # http://localhost:3000
 ```
 
-| Rute | Isi |
+| Route | Contents |
 |---|---|
-| `/` | Landing: statistik live, instrumen threshold, grid verdict, kasus terbaru |
-| `/moderate` | Submit konten, appeal, meja review manual creator komunitas |
-| `/audit` | Audit log publik: ledger yang bisa difilter + rekam kasus lengkap |
-| `/agents` | Daftar reviewer agent, cast review, roster reputasi (skor 0–100) |
+| `/` | Landing: live stats, threshold instrument, verdict grid, latest cases |
+| `/moderate` | Submit content, appeal, community creator's manual review desk |
+| `/audit` | Public audit log: filterable ledger + full case record |
+| `/agents` | Register reviewer agents, cast reviews, reputation roster (score 0–100) |
 
-Semua read bersifat publik (tanpa wallet); write butuh MetaMask di jaringan
-GenLayer Studio (chain id `61999`). Detail lengkap di
+All reads are public (no wallet required); writes require MetaMask on the
+GenLayer Studio network (chain id `61999`). Full details in
 [`frontend/README.md`](frontend/README.md).
 
 ## Deploy
 
-| Jaringan | Kontrak |
+| Network | Contract |
 |---|---|
 | GenLayer Studio (studionet) | [`0x7feE237eC31b90C2A3746437a920BfdFbf74457b`](https://studio.genlayer.com/) |
 
-Kontrak juga bisa di-deploy ulang melalui [GenLayer Studio](https://studio.genlayer.com/) (unggah `contracts/panoptes.py`), atau lokal:
+The contract can also be redeployed via [GenLayer Studio](https://studio.genlayer.com/) (upload `contracts/panoptes.py`), or locally:
 
 ```bash
 npm install -g genlayer
@@ -149,13 +149,13 @@ genlayer up
 genlayer deploy
 ```
 
-## Teknologi
+## Technology
 
-- **Kontrak**: GenLayer Intelligent Contracts (Python) di GenVM
-- **Konsensus**: Optimistic Democracy + Equivalence Pattern 1 (partial field matching)
+- **Contract**: GenLayer Intelligent Contracts (Python) on GenVM
+- **Consensus**: Optimistic Democracy + Equivalence Principle Pattern 1 (partial field matching)
 - **Frontend**: Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + genlayer-js + TanStack Query
 - **Toolchain**: `genlayer-py`, `genlayer-test`, `genvm-linter`
 
-## Lisensi
+## License
 
 MIT

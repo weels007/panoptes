@@ -35,7 +35,7 @@ const FEE_LEVELS: { value: FeePresetLevel; label: string; hint: string }[] = [
 export default function ModeratePage() {
   const { address, isConnected } = useWallet();
   const { data: communities } = useCommunities();
-  // Semua halaman ledger — kasus lama tetap bisa di-appeal.
+  // All ledger pages — older cases remain reachable for appeals.
   const { data: cases } = useAllCases();
 
   return (
@@ -502,7 +502,7 @@ function ReviewRow({ case: c }: { case: Case }) {
 
       {needsNote && (
         <div className="mt-3 space-y-3 animate-fade-in">
-          {/* Keputusan pihak ketiga wajib menyimpan justifikasinya (on-chain). */}
+          {/* A third-party decision must store its justification (on-chain). */}
           <div>
             <div className="flex items-baseline justify-between mb-1.5">
               <span className="label-mono">resolution note (required)</span>

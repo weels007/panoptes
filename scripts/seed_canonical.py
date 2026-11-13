@@ -1,13 +1,13 @@
-"""Seed instance canonical Panoptes di studionet dengan data demo.
+"""Seed the canonical Panoptes instance on studionet with demo data.
 
-Menambahkan komunitas + kasus (via `genlayer write`, lihat README) lalu
-mendaftarkan reviewer agent independen + satu review terhadap kasus terbaru.
+Adds an independent reviewer agent + one review against the latest case.
+(Community + case are typically created via `genlayer write` — see README.)
 
-Jalankan dengan:
+Run with:
     python scripts/seed_canonical.py <contract_address>
 
-Catatan: gltest membaca jaringan dari plugin config yang di-set oleh CLI pytest;
-script ini menyetelnya manual ke studionet sebelum memakai API gltest.
+Note: gltest reads the network from plugin config set by the pytest CLI;
+this script sets it manually to studionet before using the gltest API.
 """
 
 import sys
@@ -47,11 +47,11 @@ def main() -> int:
     contract = factory.build_contract(contract_address=address)
 
     stats = contract.get_stats(args=[]).call()
-    print(f"stats sebelum seed: {stats}")
+    print(f"stats before seed: {stats}")
 
     cases = contract.list_cases(args=[0, 50]).call()
     if not cases:
-        print("Tidak ada kasus — buat komunitas + kasus dulu, misalnya:")
+        print("No cases found — create a community + case first, for example:")
         print(
             "  genlayer write "
             f"{address} create_community "
@@ -66,35 +66,35 @@ def main() -> int:
 
     case_id = _latest_case_id(cases)
     case = contract.get_case(args=[case_id]).call()
-    print(f"kasus terbaru: {case_id} -> {case['decision']}")
+    print(f"latest case: {case_id} -> {case['decision']}")
 
-    # Reviewer independen: akun berbeda dari submitter/creator (asmodeus-deploy).
+    # Independent reviewer: different account from submitter/creator.
     reviewer = get_accounts()[1]
     reviewer_contract = contract.connect(reviewer)
     print(f"reviewer: {reviewer.address}")
 
     try:
         agent = contract.get_agent(args=[reviewer.address]).call()
-        print(f"agent sudah terdaftar: {agent['name']}")
+        print(f"agent already registered: {agent['name']}")
     except Exception:
         receipt = reviewer_contract.register_agent(
             args=["Sentinel Reviewer"]
         ).transact()
         assert tx_execution_succeeded(receipt), receipt
-        print("agent terdaftar: Sentinel Reviewer")
+        print("agent registered: Sentinel Reviewer")
 
     reviews = contract.get_case_reviews(args=[case_id]).call()
     if reviewer.address in reviews:
-        print("review sudah ada — tidak diduplikasi")
+        print("review already exists — not duplicated")
     else:
         receipt = reviewer_contract.review_case(
             args=[case_id, case["decision"], "Clear-cut violation, matches the verdict."]
         ).transact(wait_interval=10000, wait_retries=20)
         assert tx_execution_succeeded(receipt), receipt
-        print(f"review tercatat untuk {case_id}")
+        print(f"review recorded for {case_id}")
 
     stats = contract.get_stats(args=[]).call()
-    print(f"stats sesudah seed: {stats}")
+    print(f"stats after seed: {stats}")
     return 0
 
 

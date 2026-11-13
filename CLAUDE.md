@@ -28,7 +28,7 @@ tests/
 deploy/             # TypeScript deployment scripts
 ```
 
-**Frontend**: belum ada (fase berikutnya) — rencananya Next.js + `genlayer-js` terhadap kontrak `Panoptes`.
+**Frontend**: Next.js 16 (App Router) + TypeScript + `genlayer-js` in `frontend/`, targeting the `Panoptes` contract.
 
 ## Development Workflow
 

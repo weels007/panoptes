@@ -1,7 +1,7 @@
-"""Direct mode tests untuk Panoptes — tanpa server, LLM di-mock.
+"""Direct mode tests for Panoptes — no server, mocked LLM.
 
-Catatan: direct mode hanya menjalankan leader function; logika validator
-diuji lewat integration tests terhadap studionet.
+Note: direct mode only runs the leader function; validator logic is exercised
+via integration tests against studionet.
 """
 
 import json
@@ -82,7 +82,7 @@ def test_get_unknown_community_fails(direct_vm, direct_deploy):
 
 
 # ----------------------------------------------------------------------
-# Submit & threshold (keputusan dihitung kontrak, bukan model)
+# Submit & thresholds (decision computed by contract, never the model)
 # ----------------------------------------------------------------------
 
 
@@ -178,12 +178,12 @@ def test_submit_too_long_fails(direct_vm, direct_deploy, direct_alice):
 
 
 # ----------------------------------------------------------------------
-# Output LLM yang tidak valid ditolak sebelum menyimpan apa pun
+# Invalid LLM output is rejected before anything is stored
 # ----------------------------------------------------------------------
 
 
 def test_smuggled_decision_key_rejected(direct_vm, direct_deploy, direct_alice):
-    """Model menyelundupkan field 'decision' -> ditolak (bukan keputusan model)."""
+    """Model smuggles a 'decision' field -> rejected (not the model's call)."""
     contract = direct_deploy("contracts/panoptes.py")
     _setup_community(direct_vm, contract, direct_alice)
 
@@ -265,7 +265,7 @@ def test_appeal_overturns_decision(direct_vm, direct_deploy, direct_alice):
     case_id = contract.submit_content(COMMUNITY_ID, "Buy cheap pills now")
     assert contract.get_case(case_id).decision == "BLOCK"
 
-    # Appeal: klasifikasi ulang dengan argumen -> keputusan berubah.
+    # Appeal: re-classify with argument -> decision changes.
     direct_vm.clear_mocks()
     _mock(direct_vm, _llm_response("none", 10), match=r"<appeal_argument>")
 
@@ -323,7 +323,7 @@ def test_human_review_flow(direct_vm, direct_deploy, direct_alice, direct_bob):
     _mock(direct_vm, _llm_response("spam", 95))
     case_id = contract.submit_content(COMMUNITY_ID, "Buy cheap pills now")
 
-    # Hanya creator komunitas (alice) boleh menandai.
+    # Only the community creator (alice) may flag.
     direct_vm.sender = direct_bob
     with direct_vm.expect_revert("community creator"):
         contract.flag_for_human_review(case_id)
@@ -332,15 +332,15 @@ def test_human_review_flow(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract.flag_for_human_review(case_id)
     assert contract.get_case(case_id).status == "human_review"
 
-    # Flag kedua kali gagal.
+    # A second flag fails.
     with direct_vm.expect_revert("Already under human review"):
         contract.flag_for_human_review(case_id)
 
-    # Appeal diblokir selama human review.
+    # Appeals are blocked while under human review.
     with direct_vm.expect_revert("under human review"):
         contract.appeal_case(case_id, "please reconsider")
 
-    # Hanya creator yang boleh memutuskan.
+    # Only the creator may resolve.
     direct_vm.sender = direct_bob
     with direct_vm.expect_revert("community creator"):
         contract.resolve_human_review(case_id, "ALLOW", "manual override")
@@ -349,7 +349,7 @@ def test_human_review_flow(direct_vm, direct_deploy, direct_alice, direct_bob):
     with direct_vm.expect_revert("final_decision must be"):
         contract.resolve_human_review(case_id, "MAYBE", "manual override")
 
-    # Keputusan pihak ketiga wajib punya justifikasi.
+    # A third-party decision must include justification.
     with direct_vm.expect_revert("note must be"):
         contract.resolve_human_review(case_id, "ALLOW", "   ")
 
@@ -365,7 +365,7 @@ def test_human_review_flow(direct_vm, direct_deploy, direct_alice, direct_bob):
     assert stats["allowed"] == 1
     assert stats["blocked"] == 0
 
-    # Justifikasi tersimpan di riwayat.
+    # The justification is stored in history.
     history = contract.get_case_history(case_id)
     assert history[-1].action == "human_review"
     assert history[-1].note == "Reviewed against the rules; clearly a false positive."
@@ -385,7 +385,7 @@ def test_resolve_without_flag_fails(direct_vm, direct_deploy, direct_alice):
 
 
 # ----------------------------------------------------------------------
-# Reviewer agents & reputasi
+# Reviewer agents & reputation
 # ----------------------------------------------------------------------
 
 
@@ -434,7 +434,7 @@ def test_review_updates_reputation(direct_vm, direct_deploy, direct_alice, direc
     direct_vm.sender = direct_bob
     contract.register_agent("Bob Reviewer")
 
-    # Keputusan kontrak BLOCK; bob setuju -> reputasi naik.
+    # Contract decision is BLOCK; bob agrees -> reputation increases.
     contract.review_case(case_id, "BLOCK", "Agreed, it is spam.")
     agent = contract.get_agent(to_hex(direct_bob))
     assert agent["reviews_total"] == 1
@@ -445,7 +445,7 @@ def test_review_updates_reputation(direct_vm, direct_deploy, direct_alice, direc
     assert to_hex(direct_bob) in reviews
     assert reviews[to_hex(direct_bob)].agreed is True
 
-    # Review kedua untuk kasus yang sama ditolak.
+    # A second review for the same case is rejected.
     with direct_vm.expect_revert("Already reviewed this case"):
         contract.review_case(case_id, "ALLOW", "changed my mind")
 
@@ -488,7 +488,7 @@ def test_reputation_resync_when_appeal_overturns(
 
     assert contract.get_agent(to_hex(direct_bob))["score"] == 100
 
-    # Appeal mengubah BLOCK -> ALLOW; review bob harus disinkronkan.
+    # Appeal changes BLOCK -> ALLOW; bob's review must be re-synced.
     direct_vm.sender = direct_alice
     direct_vm.clear_mocks()
     _mock(direct_vm, _llm_response("none", 10), match=r"<appeal_argument>")
@@ -567,21 +567,21 @@ def test_list_communities_and_agents(direct_vm, direct_deploy, direct_alice, dir
 
 
 # ----------------------------------------------------------------------
-# Self-review dilarang — reputasi harus dari pihak independen
+# Self-review forbidden — reputation must come from independent parties
 # ----------------------------------------------------------------------
 
 
 def test_submitter_cannot_review_own_case(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):
-    """Submitter menyuplai outcome dan review -> sybil score, ditolak."""
+    """Submitter supplies both outcome and review -> sybil score, rejected."""
     contract = direct_deploy("contracts/panoptes.py")
     _setup_community(direct_vm, contract, direct_alice)
 
     _mock(direct_vm, _llm_response("spam", 95))
     case_id = contract.submit_content(COMMUNITY_ID, "Buy cheap pills now")
 
-    # Alice (submitter) mendaftar sebagai agent lalu mencoba menilai kasusnya.
+    # Alice (submitter) registers as an agent and tries to judge her own case.
     direct_vm.sender = direct_alice
     contract.register_agent("Sneaky Submitter")
     with direct_vm.expect_revert("Submitter cannot review their own case"):
@@ -594,11 +594,11 @@ def test_submitter_cannot_review_own_case(
 def test_creator_cannot_review_cases(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):
-    """Creator komunitas juga tidak boleh menilai kasus komunitasnya."""
+    """The community creator may not judge cases in their own community."""
     contract = direct_deploy("contracts/panoptes.py")
     _setup_community(direct_vm, contract, direct_alice)
 
-    # Bob yang submit, supaya alice murni sebagai creator (bukan submitter).
+    # Bob submits, so alice is purely the creator (not the submitter).
     direct_vm.sender = direct_bob
     _mock(direct_vm, _llm_response("spam", 95))
     case_id = contract.submit_content(COMMUNITY_ID, "Buy cheap pills now")
@@ -610,8 +610,8 @@ def test_creator_cannot_review_cases(
 
     assert contract.get_agent(to_hex(direct_alice))["reviews_total"] == 0
 
-    # Pihak independen (bob, submitter kasus ini) tetap terblokir sebagai
-    # submitter — pihak ketiga sungguhan adalah charlie.
+    # The independent party (bob, this case's submitter) is still blocked as
+    # submitter — a true third party would be charlie.
     direct_vm.sender = direct_bob
     contract.register_agent("Bob Reviewer")
     with direct_vm.expect_revert("Submitter cannot review their own case"):
@@ -619,14 +619,14 @@ def test_creator_cannot_review_cases(
 
 
 # ----------------------------------------------------------------------
-# Riwayat revisi — putusan lama tidak pernah hilang
+# Revision history — prior rulings are never lost
 # ----------------------------------------------------------------------
 
 
 def test_case_history_append_only(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):
-    """submit -> flag -> resolve meninggalkan jejak penuh di ledger."""
+    """submit -> flag -> resolve leaves a complete trail in the ledger."""
     contract = direct_deploy("contracts/panoptes.py")
     _setup_community(direct_vm, contract, direct_alice)
 
@@ -649,7 +649,7 @@ def test_case_history_append_only(
     history = contract.get_case_history(case_id)
     assert [rev.action for rev in history] == ["submit", "flag", "human_review"]
     assert [rev.seq for rev in history] == [0, 1, 2]
-    # Keputusan lama tetap terbaca: submit=BLOCK, resolve=ALLOW.
+    # Prior decisions remain readable: submit=BLOCK, resolve=ALLOW.
     assert history[0].decision == "BLOCK"
     assert history[2].decision == "ALLOW"
     assert history[2].note == "false positive, approved"
@@ -671,7 +671,7 @@ def test_appeal_recorded_in_history(direct_vm, direct_deploy, direct_alice):
     assert [rev.action for rev in history] == ["submit", "appeal"]
     assert history[1].note == "This is a doctor-approved offer."
     assert history[1].decision == "ALLOW"
-    # Revisi pertama masih menyimpan keputusan BLOCK asli.
+    # The first revision still holds the original BLOCK decision.
     assert history[0].decision == "BLOCK"
 
 
@@ -683,17 +683,17 @@ def test_history_unknown_case_fails(direct_vm, direct_deploy):
 
 
 # ----------------------------------------------------------------------
-# Confidence terikat prompt (toleransi antar validator diuji di integration)
+# Confidence bound by prompt (inter-validator tolerance exercised in integration)
 # ----------------------------------------------------------------------
 
 
 def test_prompt_requires_multiples_of_5(
     direct_vm, direct_deploy, direct_alice
 ):
-    """Prompt wajib meminta kelipatan 5 agar confidence konsisten antar validator.
+    """Prompt must request multiples of 5 so confidence is consistent across validators.
 
-    Mock hanya match jika prompt mengandung teks ini — kalau prompt berubah,
-    submit gagal dan tes ini merah.
+    The mock only matches if the prompt contains this text — if the prompt
+    changes, submit fails and this test turns red.
     """
     contract = direct_deploy("contracts/panoptes.py")
     _setup_community(direct_vm, contract, direct_alice)

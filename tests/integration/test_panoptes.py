@@ -1,9 +1,9 @@
-"""Integration tests Panoptes — konsensus penuh (leader + validator) dengan LLM nyata.
+"""Panoptes integration tests — full consensus (leader + validators) with real LLMs.
 
-Jalankan dengan:
+Run with:
     gltest tests/integration/test_panoptes.py -v -s --network studionet
 
-Catatan: studionet membatasi 60 req/min, jadi test ini dibuat sesedikit mungkin.
+Note: studionet is rate-limited (60 req/min), so this suite is kept minimal.
 """
 
 import pytest
@@ -27,7 +27,7 @@ ALLOWED_CATEGORIES = (
 
 
 def _latest_case_id(cases: dict) -> str:
-    """case_id berurutan numerik: case-0, case-1, ... case-10."""
+    """Case IDs are sequential numerics: case-0, case-1, ... case-10."""
     return max(cases.keys(), key=lambda cid: int(cid.split("-")[1]))
 
 
@@ -57,7 +57,7 @@ def test_create_community(contract):
 
 @pytest.mark.integration
 def test_submit_content_full_consensus(contract):
-    """Submit konten -> konsensus LLM penuh -> keputusan dari threshold kontrak."""
+    """Submit content -> full LLM consensus -> decision from contract thresholds."""
     receipt = contract.submit_content(
         args=[
             COMMUNITY_ID,
@@ -70,7 +70,7 @@ def test_submit_content_full_consensus(contract):
     total_before = contract.get_stats(args=[]).call()["total_cases"]
     assert total_before >= 1
 
-    # Ambil kasus terbaru dari audit log publik (tanpa wallet).
+    # Fetch the latest case from the public audit log (no wallet needed).
     cases = contract.list_cases(args=[0, 10]).call()
     assert len(cases) >= 1
 
@@ -83,11 +83,11 @@ def test_submit_content_full_consensus(contract):
     assert 0 <= case["confidence"] <= 100
     assert case["reasoning"]
 
-    # Konten spam/scam yang jelas harus diblokir oleh threshold kontrak.
+    # Clearly spam/scam content must be blocked by the contract thresholds.
     assert case["decision"] == "BLOCK"
     assert case["primary_category"] in ("spam", "scam")
 
-    # Riwayat revisi tercatat sejak submit (append-only, readback publik).
+    # Revision history is recorded from submit onward (append-only, public readback).
     history = contract.get_case_history(args=[case_id]).call()
     assert len(history) >= 1
     assert history[0]["action"] == "submit"
@@ -99,15 +99,15 @@ def test_submit_content_full_consensus(contract):
 
 @pytest.mark.integration
 def test_agent_review_and_reputation(contract):
-    """Agent terdaftar mereview kasus; reputasi dihitung dari kesepakatan.
+    """A registered agent reviews a case; reputation is computed from agreement.
 
-    Larangan self-review: reviewer harus akun berbeda dari submitter.
+    Self-review ban: the reviewer must be a different account from the submitter.
     """
     cases = contract.list_cases(args=[0, 10]).call()
     case_id = _latest_case_id(cases)
     case = contract.get_case(args=[case_id]).call()
 
-    # Akun kedua = reviewer independen (bukan submitter kasus).
+    # Second account = independent reviewer (not the case submitter).
     reviewer = get_accounts()[1]
     reviewer_contract = contract.connect(reviewer)
 
@@ -116,14 +116,12 @@ def test_agent_review_and_reputation(contract):
     ).transact()
     assert tx_execution_succeeded(receipt)
 
-    # Review dengan verdict yang sama dengan keputusan kontrak -> agreed.
+    # Review with the same verdict as the contract decision -> agreed.
     receipt = reviewer_contract.review_case(
         args=[case_id, case["decision"], "Clear-cut case, matches the verdict."]
     ).transact(wait_interval=10000, wait_retries=20)
     assert tx_execution_succeeded(receipt)
 
-    # Submitter tidak boleh menilai kasusnya sendiri (regresi sybil):
-    # akun default adalah submitter kasus ini — cek langsung lewat readback.
     agent_address = reviewer.address
 
     agent = contract.get_agent(args=[agent_address]).call()

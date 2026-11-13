@@ -3,25 +3,25 @@
 """
 Panoptes — Decentralized Content Moderation on GenLayer.
 
-Banyak AI validator menilai konten secara independen melalui Optimistic
-Democracy. Keputusan akhir (ALLOW / FLAG / BLOCK) tidak pernah datang dari
-model: model hanya mengembalikan kategori + confidence, lalu threshold tetap
-di dalam kontrak yang mengubahnya menjadi keputusan.
+Multiple AI validators assess content independently through Optimistic
+Democracy. The final decision (ALLOW / FLAG / BLOCK) never comes from the
+model: the model returns only a category + confidence, and fixed thresholds
+inside the contract turn that into a decision.
 
-Alur:
-  1. Komunitas mendaftarkan guidelines (aturan bahasa alami).
-  2. Konten disubmit -> leader mengklasifikasi via LLM, validator menjalankan
-     klasifikasi yang sama secara independen dan membandingkan field keputusan
-     (primary_category + decision). Konsensus gagal -> transaksi undetermined.
-  3. Threshold di kontrak -> ALLOW / FLAG / BLOCK.
-  4. Submitter dapat banding (appeal) maksimal MAX_APPEALS kali, dengan
-     argumen yang ikut masuk ke prompt.
-  5. Creator komunitas dapat menandai kasus untuk human review lalu
-     memutuskan keputusan final.
-  6. Agent terdaftar mereview kasus; reputasi mereka dihitung dari
-     kesesuaian review dengan keputusan final (disinkronkan saat keputusan
-     berubah lewat appeal / human review).
-  7. Semua kasus dapat dibaca publik tanpa wallet (audit log).
+Flow:
+  1. A community registers guidelines (natural-language rules).
+  2. Content is submitted -> the leader classifies via LLM, validators run the
+     same classification independently and compare decision fields
+     (primary_category + decision). Consensus failure -> undetermined tx.
+  3. Contract thresholds -> ALLOW / FLAG / BLOCK.
+  4. The submitter may appeal (appeal) up to MAX_APPEALS times, with an
+     argument included in the prompt.
+  5. The community creator can flag a case for human review and then record a
+     final decision.
+  6. Registered agents review cases; their reputation is computed from
+     agreement with the final decision (re-synced when the decision changes
+     via appeal / human review).
+  7. All cases are publicly readable without a wallet (audit log).
 """
 
 import json
@@ -44,7 +44,7 @@ ALLOWED_CATEGORIES = (
 )
 ALLOWED_DECISIONS = ("ALLOW", "FLAG", "BLOCK")
 
-# Threshold tetap di kontrak — model TIDAK pernah menentukan keputusan.
+# Fixed thresholds in the contract — the model NEVER determines the decision.
 BLOCK_THRESHOLD = 70  # confidence > 70 -> BLOCK
 FLAG_THRESHOLD = 40  # confidence > 40 -> FLAG
 
@@ -63,20 +63,20 @@ MAX_PAGE = 50
 MAX_NOTE_LEN = 1000
 MAX_HISTORY_PER_CASE = 16
 
-# Toleransi confidence antar validator. Confidence adalah input deterministik
-# ke threshold (40/70), jadi wajib terikat konsensus — bukan milik leader
-# semata. Dengan toleransi ini, angka yang tersimpan selalu berada dalam
-# +/- CONFIDENCE_TOLERANCE dari keyakinan setuju validator lain.
+# Inter-validator confidence tolerance. Confidence is a deterministic input to
+# the thresholds (40/70), so it must be consensus-bound — not the leader's
+# alone. With this tolerance, the stored value stays within
+# +/- CONFIDENCE_TOLERANCE of the confidence of other agreeing validators.
 CONFIDENCE_TOLERANCE = 10
 
 
 def _now() -> str:
-    """Timestamp transaksi — deterministik di semua node."""
+    """Transaction timestamp — deterministic across all nodes."""
     return gl.message_raw["datetime"]
 
 
 def _decision_for(primary_category: str, confidence: int) -> str:
-    """Mengubah klasifikasi model menjadi keputusan lewat threshold tetap."""
+    """Convert the model's classification into a decision via fixed thresholds."""
     if primary_category == "none":
         return "ALLOW"
     if confidence > BLOCK_THRESHOLD:
@@ -128,7 +128,7 @@ def _build_prompt(rules: str, content: str, appeal_argument: str) -> str:
 
 
 def _validate_llm_output(raw) -> dict:
-    """Validasi ketat output LLM. Field keputusan tidak boleh berasal dari model."""
+    """Strictly validate LLM output. Decision fields must never come from the model."""
     if not isinstance(raw, dict):
         raise gl.vm.UserError(ERROR_LLM + " response is not a JSON object")
 
@@ -138,7 +138,7 @@ def _validate_llm_output(raw) -> dict:
             raise gl.vm.UserError(ERROR_LLM + " missing key: " + str(key))
     for key in raw.keys():
         if key not in expected_keys:
-            # Menolak penyelundupan field seperti "decision" dari model.
+            # Reject smuggled fields such as "decision" from the model.
             raise gl.vm.UserError(ERROR_LLM + " forbidden key: " + str(key))
 
     primary = raw["primary_category"]
@@ -155,7 +155,7 @@ def _validate_llm_output(raw) -> dict:
         if cat not in cleaned:
             cleaned.append(cat)
 
-    # Normalisasi deterministik: primary_category selalu ada di categories.
+    # Deterministic normalization: primary_category is always in categories.
     if primary == "none":
         cleaned = []
     elif primary not in cleaned:
@@ -189,19 +189,19 @@ def _validate_llm_output(raw) -> dict:
 
 
 def _handle_leader_error(leader_result, leader_fn) -> bool:
-    """Menangani kasus leader error: validator menjalankan ulang tugasnya."""
+    """Handle a leader error: the validator re-runs the task."""
     leader_msg = ""
     if hasattr(leader_result, "message"):
         leader_msg = leader_result.message
     try:
         leader_fn()
-        # Leader error tetapi validator sukses -> tidak setuju.
+        # Leader errored but validator succeeded -> disagree.
         return False
     except gl.vm.UserError as e:
         validator_msg = e.message if hasattr(e, "message") else str(e)
         if validator_msg.startswith(ERROR_EXPECTED):
             return validator_msg == leader_msg
-        # Error LLM atau tidak dikenal -> tidak setuju, paksa rotasi leader.
+        # LLM or unknown error -> disagree, force leader rotation.
         return False
     except Exception:
         return False
@@ -209,13 +209,13 @@ def _handle_leader_error(leader_result, leader_fn) -> bool:
 
 def _run_classification(rules: str, content: str, appeal_argument: str) -> dict:
     """
-    Klasifikasi dengan Equivalence Principle (Pattern 1: partial field matching).
+    Classify with the Equivalence Principle (Pattern 1: partial field matching).
 
-    Leader menjalankan klasifikasi LLM; setiap validator menjalankan klasifikasi
-    yang sama secara independen lalu membandingkan field keputusan:
-    primary_category, decision (turunan deterministik dari threshold), dan
-    confidence dalam toleransi CONFIDENCE_TOLERANCE. Teks reasoning boleh
-    berbeda antar node dan tidak dibandingkan.
+    The leader runs the LLM classification; each validator runs the same
+    classification independently and compares decision fields:
+    primary_category, decision (deterministic from thresholds), and confidence
+    within CONFIDENCE_TOLERANCE. Reasoning text may differ across nodes and is
+    not compared.
     """
 
     def leader_fn() -> dict:
@@ -246,13 +246,13 @@ def _run_classification(rules: str, content: str, appeal_argument: str) -> dict:
         except Exception:
             return False
 
-        # Verifikasi independen: validator harus menurunkan keputusan yang sama
-        # dari klasifikasinya sendiri, bukan sekadar memeriksa bentuk JSON.
+        # Independent verification: the validator must derive the same decision
+        # from its own classification, not merely check the JSON shape.
         if theirs_primary != mine["primary_category"]:
             return False
-        # Confidence juga harus terikat: angka yang disimpan menentukan
-        # posisi di ruler threshold, jadi tidak boleh berbeda jauh dari
-        # keyakinan validator lain yang menyetujui.
+        # Confidence must also be bound: the stored value determines the
+        # position on the threshold ruler, so it must not differ far from the
+        # confidence of other agreeing validators.
         if abs(theirs_confidence - mine["confidence"]) > CONFIDENCE_TOLERANCE:
             return False
         return _decision_for(theirs_primary, theirs_confidence) == _decision_for(
@@ -260,7 +260,7 @@ def _run_classification(rules: str, content: str, appeal_argument: str) -> dict:
         )
 
     result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
-    # Keputusan dihitung di kontrak dari threshold, bukan dari model.
+    # The decision is computed in-contract from thresholds, never from the model.
     result["decision"] = _decision_for(
         result["primary_category"], result["confidence"]
     )
@@ -318,7 +318,7 @@ class Agent:
 @allow_storage
 @dataclass
 class CaseRevision:
-    """Satu baris riwayat — putusan lama tidak pernah hilang dari ledger."""
+    """A single history entry — prior rulings are never removed from the ledger."""
 
     seq: u256
     action: str  # "submit" | "appeal" | "flag" | "human_review"
@@ -326,7 +326,7 @@ class CaseRevision:
     primary_category: str
     confidence: u256
     reasoning: str
-    note: str  # justifikasi pihak ketiga; kosong untuk aksi mesin
+    note: str  # third-party justification; empty for machine actions
     actor: Address
     at: str
 
@@ -513,7 +513,7 @@ class Panoptes(gl.Contract):
                 f"{ERROR_EXPECTED} final_decision must be one of {ALLOWED_DECISIONS}"
             )
         if len(note.strip()) == 0 or len(note) > MAX_NOTE_LEN:
-            # Keputusan pihak ketiga wajib menyimpan justifikasinya.
+            # A third-party decision must store its justification.
             raise gl.vm.UserError(
                 f"{ERROR_EXPECTED} note must be 1-{MAX_NOTE_LEN} chars"
             )
@@ -559,8 +559,8 @@ class Panoptes(gl.Contract):
         if sender not in self.agents:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Not a registered agent")
         case = self._require_case(case_id)
-        # Reputasi harus dari pihak independen: submitter dan creator
-        # komunitas tidak boleh menilai kasus yang mereka kendalikan.
+        # Reputation must come from independent parties: the submitter and the
+        # community creator may not judge cases they control.
         if sender == case.submitter:
             raise gl.vm.UserError(
                 f"{ERROR_EXPECTED} Submitter cannot review their own case"
@@ -603,7 +603,7 @@ class Panoptes(gl.Contract):
         self.review_count += 1
 
     # ------------------------------------------------------------------
-    # Views — audit log publik
+    # Views — public audit log
     # ------------------------------------------------------------------
 
     @gl.public.view
@@ -648,7 +648,7 @@ class Panoptes(gl.Contract):
 
     @gl.public.view
     def get_case_history(self, case_id: str) -> list:
-        """Riwayat revisi append-only: submit -> appeal* -> flag? -> resolve."""
+        """Append-only revision history: submit -> appeal* -> flag? -> resolve."""
         self._require_case(case_id)
         if case_id not in self.case_history:
             return []
@@ -717,10 +717,10 @@ class Panoptes(gl.Contract):
         note: str,
         actor: Address,
     ) -> None:
-        """Append satu revisi. Riwayat bersifat append-only — tidak ditimpa."""
+        """Append a single revision. History is append-only — never overwritten."""
         history = self.case_history.get_or_insert_default(case_id)
         if len(history) >= MAX_HISTORY_PER_CASE:
-            # Hard stop: rekam tetap ada di ledger, tidak ada overwrite.
+            # Hard stop: existing entries remain in the ledger, no overwrite.
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Case history limit reached")
         history.append(
             CaseRevision(
@@ -752,7 +752,7 @@ class Panoptes(gl.Contract):
             self.blocked_count += delta
 
     def _sync_case_reviews(self, case_id: str, old_decision: str, new_decision: str) -> None:
-        """Sinkronkan reputasi agent saat keputusan kasus berubah."""
+        """Re-sync agent reputation when a case's decision changes."""
         if old_decision == new_decision or case_id not in self.case_reviews:
             return
         for review in self.case_reviews[case_id]:
