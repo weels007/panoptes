@@ -1,0 +1,47 @@
+"use client";
+
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
+import { WalletProvider } from "@/lib/genlayer/WalletProvider";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  // Use useState to ensure QueryClient is only created once per component lifecycle
+  // This prevents the client from being recreated on every render
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 2000,
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <WalletProvider>
+        {children}
+      </WalletProvider>
+      <Toaster
+        position="top-right"
+        theme="light"
+        richColors
+        closeButton
+        offset="80px"
+        toastOptions={{
+          style: {
+            background: "#ffffff",
+            border: "1px solid #dce0e8",
+            color: "#171a2b",
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.8125rem",
+            boxShadow: "0 12px 32px rgba(23, 26, 43, 0.14)",
+          },
+        }}
+      />
+    </QueryClientProvider>
+  );
+}

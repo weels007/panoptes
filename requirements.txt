@@ -1,0 +1,8 @@
+genlayer-py @ git+https://github.com/genlayerlabs/genlayer-py@v0.18
+genlayer-test @ git+https://github.com/genlayerlabs/genlayer-testing-suite@v0.29
+# Pinned to an exact commit (the v0.11.1-rc.2 tree) — never a moving branch.
+genvm-linter @ git+https://github.com/genlayerlabs/genvm-linter@28450e665666300fc648dbe495110dfd0cb6a7b4
+requests>=2.31.0
+python-dotenv>=1.0.1
+eth-account>=0.13.3
+eth-utils>=5.0.0

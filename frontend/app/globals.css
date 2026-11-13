@@ -1,0 +1,376 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   Panoptes design system
+   Subject: decentralized content moderation — an adjudication ledger.
+   Palette: porcelain paper, ink text, bronze accent.
+   Verdicts: allow green, flag amber, block red (fixed, from the contract).
+   ========================================================================= */
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/InstrumentSerif-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/InstrumentSerif-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-body: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Paper & ink */
+  --background: #f2f4f8;
+  --foreground: #171a2b;
+
+  --card: #ffffff;
+  --card-foreground: #171a2b;
+
+  --popover: #ffffff;
+  --popover-foreground: #171a2b;
+
+  /* Primary = ink block */
+  --primary: #171a2b;
+  --primary-foreground: #f2f4f8;
+
+  --secondary: #e7eaf1;
+  --secondary-foreground: #171a2b;
+
+  --muted: #e9ecf2;
+  --muted-foreground: #5a6072;
+
+  /* Accent = bronze */
+  --accent: #b4762f;
+  --accent-foreground: #ffffff;
+
+  --destructive: #a63232;
+  --destructive-foreground: #ffffff;
+
+  --border: #dce0e8;
+  --input: #dce0e8;
+  --ring: #b4762f;
+
+  /* Verdict colors — mirrors the contract's fixed thresholds */
+  --allow: #2e7d5b;
+  --flag: #c77d1a;
+  --block: #a63232;
+
+  --chart-1: #2e7d5b;
+  --chart-2: #c77d1a;
+  --chart-3: #a63232;
+  --chart-4: #171a2b;
+  --chart-5: #b4762f;
+
+  --radius: 0.25rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #171a2b;
+  --sidebar-primary: #171a2b;
+  --sidebar-primary-foreground: #f2f4f8;
+  --sidebar-accent: #e7eaf1;
+  --sidebar-accent-foreground: #171a2b;
+  --sidebar-border: #dce0e8;
+  --sidebar-ring: #b4762f;
+}
+
+.dark {
+  --background: #171a2b;
+  --foreground: #f2f4f8;
+  --card: #1e2236;
+  --card-foreground: #f2f4f8;
+  --popover: #1e2236;
+  --popover-foreground: #f2f4f8;
+  --primary: #f2f4f8;
+  --primary-foreground: #171a2b;
+  --secondary: #262b44;
+  --secondary-foreground: #f2f4f8;
+  --muted: #262b44;
+  --muted-foreground: #9aa1b5;
+  --accent: #d0964f;
+  --accent-foreground: #171a2b;
+  --border: #333a58;
+  --input: #333a58;
+  --ring: #d0964f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Panoptes-specific */
+  --color-allow: var(--allow);
+  --color-flag: var(--flag);
+  --color-block: var(--block);
+  --color-bronze: var(--accent);
+  --color-ink: #171a2b;
+  --color-porcelain: #f2f4f8;
+  --color-hairline: #dce0e8;
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --animate-fade-in: fadeIn 0.5s ease-out forwards;
+  --animate-slide-up: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--background);
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* Selection reads like a highlighter mark on the ledger */
+  ::selection {
+    background: rgba(180, 118, 47, 0.25);
+  }
+}
+
+@layer components {
+  /* ---- Editorial primitives ---------------------------------------- */
+
+  /* Small uppercase mono label — the ledger's voice */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .data-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Paper sheet: white card, hairline border, no soft shadows */
+  .sheet {
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+
+  .rule-t {
+    border-top: 1px solid var(--border);
+  }
+
+  .rule-b {
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Buttons: solid ink, crisp corners */
+  .btn-ink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.625rem 1.125rem;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .btn-ink:hover:not(:disabled) {
+    background: #232741;
+  }
+  .btn-ink:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-bronze {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--accent);
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.625rem 1.125rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .btn-bronze:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-bronze:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.625rem 1.125rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--secondary);
+    border-color: var(--foreground);
+  }
+  .btn-ghost:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* Text inputs: paper with hairline, focus ring bronze */
+  .field {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.625rem 0.75rem;
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    color: var(--foreground);
+    transition: border-color 0.15s ease;
+  }
+  .field::placeholder {
+    color: var(--muted-foreground);
+    opacity: 0.7;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(180, 118, 47, 0.15);
+  }
+  .field-mono {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+}
